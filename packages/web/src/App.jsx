@@ -10,6 +10,8 @@ const getApiBaseUrl = () => {
 export default function App() {
   const apiBaseUrl = getApiBaseUrl();
   const healthUrl = apiBaseUrl ? `${apiBaseUrl}/health` : "";
+  const apiLabel =
+    apiBaseUrl.length > 48 ? `${apiBaseUrl.slice(0, 45)}...` : apiBaseUrl;
 
   return (
     <div className="page">
@@ -27,17 +29,26 @@ export default function App() {
           <p className="body">
             Salud, disponibilidad y reservas con control de concurrencia.
           </p>
-          {healthUrl ? (
-            <a className="button" href={healthUrl} target="_blank" rel="noreferrer">
-              Ver salud
-            </a>
-          ) : (
-            <p className="muted">VITE_API_BASE_URL no configurado.</p>
-          )}
           {apiBaseUrl ? (
-            <p className="meta">API: {apiBaseUrl}</p>
+            <div className="stack">
+              <p className="meta">API configurada: {apiLabel}</p>
+              <a
+                className="button"
+                href={healthUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Ver salud
+              </a>
+            </div>
           ) : (
-            <p className="meta">API: sin base configurada.</p>
+            <div className="stack">
+              <h3 className="status-title">API no configurada</h3>
+              <p className="muted">
+                Configurar VITE_API_BASE_URL en Netlify (Site settings →
+                Environment variables).
+              </p>
+            </div>
           )}
         </section>
 
