@@ -1,0 +1,4 @@
+# No edites este archivo manualmente
+# Debe estar en .gitignore
+
+provider = "postgresql"
