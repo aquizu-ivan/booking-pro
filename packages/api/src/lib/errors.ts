@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 
 type ErrorPayload = {
   ok: false;
@@ -59,7 +60,7 @@ export const conflict = (
 ) => new AppError(409, code, message, details);
 
 export const mapPrismaError = (error: unknown): AppError | null => {
-  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
+  if (!(error instanceof PrismaClientKnownRequestError)) {
     return null;
   }
 
