@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   API_BASE_URL,
   createBooking,
+  getAdminBookings,
   getAvailability,
   getHealth,
   getServices
@@ -55,6 +56,21 @@ const formatTime = (value) => {
     timeZone: TIME_ZONE,
     hour: "2-digit",
     minute: "2-digit"
+  }).format(parsed);
+};
+
+const formatDateTime = (value) => {
+  if (!value) {
+    return "--";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+  return new Intl.DateTimeFormat("es-AR", {
+    timeZone: TIME_ZONE,
+    dateStyle: "short",
+    timeStyle: "short"
   }).format(parsed);
 };
 
@@ -120,6 +136,55 @@ const extractBooking = (data) => {
   };
 };
 
+const formatErrorDetails = (details) => {
+  if (details === null || typeof details === "undefined") {
+    return "";
+  }
+  if (typeof details === "string") {
+    return details;
+  }
+  try {
+    return JSON.stringify(details);
+  } catch {
+    return "Detalles no disponibles.";
+  }
+};
+
+const buildErrorMeta = (error) => {
+  if (!error) {
+    return [];
+  }
+  const meta = [];
+  if (error.code) {
+    meta.push(`Codigo: ${error.code}`);
+  }
+  if (error.timestamp) {
+    meta.push(`Timestamp: ${error.timestamp}`);
+  }
+  const details = formatErrorDetails(error.details);
+  if (details) {
+    meta.push(`Detalles: ${details}`);
+  }
+  return meta;
+};
+
+const StatusMessage = ({ variant, title, meta, role = "status" }) => (
+  <div
+    className={`message message-${variant}`}
+    role={role}
+    aria-live={role === "alert" ? "assertive" : "polite"}
+  >
+    <p className="message-title">{title}</p>
+    {meta && meta.length > 0 && (
+      <div className="message-meta">
+        {meta.map((item, index) => (
+          <p key={`${variant}-${index}`}>{item}</p>
+        ))}
+      </div>
+    )}
+  </div>
+);
+
 export default function App() {
   const apiBaseUrl = API_BASE_URL;
   const healthUrl = apiBaseUrl ? `${apiBaseUrl}/health` : "";
@@ -133,7 +198,8 @@ export default function App() {
   const [servicesState, setServicesState] = useState({
     status: "idle",
     items: [],
-    message: ""
+    message: "",
+    error: null
   });
   const [serviceId, setServiceId] = useState(() =>
     readStorage(STORAGE_KEYS.service)
@@ -144,7 +210,8 @@ export default function App() {
   const [availabilityState, setAvailabilityState] = useState({
     status: "idle",
     items: [],
-    message: ""
+    message: "",
+    error: null
   });
   const [selectedSlotId, setSelectedSlotId] = useState("");
   const [name, setName] = useState(() => readStorage(STORAGE_KEYS.name));
@@ -153,7 +220,16 @@ export default function App() {
   const [bookingState, setBookingState] = useState({
     status: "idle",
     message: "",
-    booking: null
+    booking: null,
+    error: null
+  });
+  const [adminInput, setAdminInput] = useState("");
+  const [adminToken, setAdminToken] = useState("");
+  const [adminState, setAdminState] = useState({
+    status: "idle",
+    items: [],
+    message: "",
+    error: null
   });
 
   useEffect(() => {
@@ -200,7 +276,7 @@ export default function App() {
     }
 
     let active = true;
-    setServicesState({ status: "loading", items: [], message: "" });
+    setServicesState({ status: "loading", items: [], message: "", error: null });
     getServices().then((result) => {
       if (!active) {
         return;
@@ -211,16 +287,23 @@ export default function App() {
           setServicesState({
             status: "empty",
             items: [],
-            message: "Sin servicios disponibles."
+            message: "Sin servicios disponibles.",
+            error: null
           });
         } else {
-          setServicesState({ status: "success", items: services, message: "" });
+          setServicesState({
+            status: "success",
+            items: services,
+            message: "",
+            error: null
+          });
         }
       } else {
         setServicesState({
           status: "error",
           items: [],
-          message: result.error.message
+          message: result.error.message,
+          error: result.error
         });
       }
     });
@@ -251,12 +334,20 @@ export default function App() {
       setAvailabilityState({
         status: "error",
         items: [],
-        message: "Selecciona una fecha valida."
+        message: "Selecciona una fecha valida.",
+        error: {
+          message: "Selecciona una fecha valida."
+        }
       });
       return;
     }
 
-    setAvailabilityState({ status: "loading", items: [], message: "" });
+    setAvailabilityState({
+      status: "loading",
+      items: [],
+      message: "",
+      error: null
+    });
     const params = { date };
     if (serviceId) {
       params.serviceId = serviceId;
@@ -268,10 +359,16 @@ export default function App() {
         setAvailabilityState({
           status: "empty",
           items: [],
-          message: "Sin horarios disponibles."
+          message: "Sin horarios disponibles.",
+          error: null
         });
       } else {
-        setAvailabilityState({ status: "success", items: slots, message: "" });
+        setAvailabilityState({
+          status: "success",
+          items: slots,
+          message: "",
+          error: null
+        });
       }
 
       const firstAvailable = slots.find((slot) => slot.available);
@@ -288,7 +385,8 @@ export default function App() {
       setAvailabilityState({
         status: "error",
         items: [],
-        message: result.error.message
+        message: result.error.message,
+        error: result.error
       });
     }
   }, [apiBaseUrl, date, serviceId]);
@@ -326,7 +424,10 @@ export default function App() {
       setBookingState({
         status: "error",
         message: "Selecciona un horario disponible.",
-        booking: null
+        booking: null,
+        error: {
+          message: "Selecciona un horario disponible."
+        }
       });
       return;
     }
@@ -334,7 +435,10 @@ export default function App() {
       setBookingState({
         status: "error",
         message: "Ingresa tu nombre.",
-        booking: null
+        booking: null,
+        error: {
+          message: "Ingresa tu nombre."
+        }
       });
       return;
     }
@@ -342,12 +446,20 @@ export default function App() {
       setBookingState({
         status: "error",
         message: "Ingresa tu email.",
-        booking: null
+        booking: null,
+        error: {
+          message: "Ingresa tu email."
+        }
       });
       return;
     }
 
-    setBookingState({ status: "loading", message: "", booking: null });
+    setBookingState({
+      status: "loading",
+      message: "",
+      booking: null,
+      error: null
+    });
     const result = await createBooking({
       serviceId,
       slotId: selectedSlotId,
@@ -362,7 +474,8 @@ export default function App() {
       setBookingState({
         status: "success",
         message: "Reserva confirmada.",
-        booking
+        booking,
+        error: null
       });
       return;
     }
@@ -370,8 +483,9 @@ export default function App() {
     if (result.error.kind === "conflict" || result.error.status === 409) {
       setBookingState({
         status: "conflict",
-        message: result.error.message || "El horario ya no esta disponible.",
-        booking: null
+        message: "Colision controlada: el horario ya fue tomado.",
+        booking: null,
+        error: result.error
       });
       await loadAvailability();
       return;
@@ -380,11 +494,115 @@ export default function App() {
     setBookingState({
       status: "error",
       message: result.error.message,
-      booking: null
+      booking: null,
+      error: result.error
     });
   };
 
   const bookingSummary = bookingState.booking;
+  const bookingMeta = bookingSummary?.id ? [`ID: ${bookingSummary.id}`] : [];
+  const bookingErrorMeta = buildErrorMeta(bookingState.error);
+  const availabilityErrorMeta = buildErrorMeta(availabilityState.error);
+  const servicesErrorMeta = buildErrorMeta(servicesState.error);
+
+  const handleAdminLogin = (event) => {
+    event.preventDefault();
+    const trimmed = adminInput.trim();
+    if (!trimmed) {
+      setAdminState({
+        status: "error",
+        items: [],
+        message: "Ingresa un token de admin.",
+        error: {
+          message: "Ingresa un token de admin."
+        }
+      });
+      return;
+    }
+    setAdminToken(trimmed);
+    setAdminInput("");
+    setAdminState({
+      status: "idle",
+      items: [],
+      message: "",
+      error: null
+    });
+  };
+
+  const handleAdminLogout = () => {
+    setAdminToken("");
+    setAdminState({
+      status: "idle",
+      items: [],
+      message: "",
+      error: null
+    });
+  };
+
+  const loadAdminBookings = useCallback(async () => {
+    if (!adminToken) {
+      return;
+    }
+    if (!date) {
+      setAdminState({
+        status: "error",
+        items: [],
+        message: "Selecciona una fecha valida.",
+        error: {
+          message: "Selecciona una fecha valida."
+        }
+      });
+      return;
+    }
+    setAdminState({
+      status: "loading",
+      items: [],
+      message: "",
+      error: null
+    });
+    const result = await getAdminBookings(adminToken, { fecha: date });
+    if (result.ok) {
+      const reservas = Array.isArray(result.data?.reservas)
+        ? result.data.reservas
+        : [];
+      if (reservas.length === 0) {
+        setAdminState({
+          status: "empty",
+          items: [],
+          message: "Sin reservas para la fecha seleccionada.",
+          error: null
+        });
+      } else {
+        setAdminState({
+          status: "success",
+          items: reservas,
+          message: "",
+          error: null
+        });
+      }
+      return;
+    }
+
+    if (result.error.status === 401 || result.error.status === 403) {
+      setAdminState({
+        status: "error",
+        items: [],
+        message: "Acceso no autorizado. Token invalido o faltante.",
+        error: result.error
+      });
+      return;
+    }
+
+    setAdminState({
+      status: "error",
+      items: [],
+      message: result.error.message,
+      error: result.error
+    });
+  }, [adminToken, date]);
+
+  const adminErrorMeta = buildErrorMeta(adminState.error);
+  const adminDate = date;
 
   return (
     <div className="page">
@@ -447,7 +665,7 @@ export default function App() {
             <div>
               <h2 id="cliente-real">Cliente real</h2>
               <p className="body">
-                Flujo observable: servicio → fecha → disponibilidad → reserva.
+                Flujo observable: servicio - fecha - disponibilidad - reserva.
               </p>
             </div>
             <span className={`badge badge-${healthBadge.kind}`}>
@@ -467,7 +685,12 @@ export default function App() {
                   <p className="muted">Cargando servicios...</p>
                 )}
                 {servicesState.status === "error" && (
-                  <p className="error">{servicesState.message}</p>
+                  <StatusMessage
+                    variant="error"
+                    title={servicesState.message}
+                    meta={servicesErrorMeta}
+                    role="alert"
+                  />
                 )}
                 {servicesState.status === "empty" && (
                   <p className="muted">Sin servicios disponibles.</p>
@@ -497,6 +720,7 @@ export default function App() {
                   value={date}
                   onChange={(event) => setDate(event.target.value)}
                 />
+                <p className="helper">Zona horaria: {TIME_ZONE}</p>
               </div>
 
               <div className="field">
@@ -505,7 +729,12 @@ export default function App() {
                   <p className="muted">Cargando horarios...</p>
                 )}
                 {availabilityState.status === "error" && (
-                  <p className="error">{availabilityState.message}</p>
+                  <StatusMessage
+                    variant="error"
+                    title={availabilityState.message}
+                    meta={availabilityErrorMeta}
+                    role="alert"
+                  />
                 )}
                 {availabilityState.status === "empty" && (
                   <p className="muted">Sin horarios para esta fecha.</p>
@@ -527,7 +756,7 @@ export default function App() {
                             disabled={!slot.available}
                           />
                           <span className="slot-time">
-                            {formatTime(slot.inicio)}–{formatTime(slot.fin)}
+                            {formatTime(slot.inicio)} - {formatTime(slot.fin)}
                           </span>
                           <span className="slot-status">
                             {slot.available ? "Disponible" : "Ocupado"}
@@ -537,13 +766,16 @@ export default function App() {
                     ))}
                   </ul>
                 )}
-                <button
-                  type="button"
-                  className="button button-secondary"
-                  onClick={loadAvailability}
-                >
-                  Refrescar disponibilidad
-                </button>
+                <div className="inline-actions">
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    onClick={loadAvailability}
+                  >
+                    Refrescar disponibilidad
+                  </button>
+                  <span className="meta">Seleccion: {selectedSlotId || "-"}</span>
+                </div>
               </div>
 
               <div className="field">
@@ -591,23 +823,137 @@ export default function App() {
                     : "Reservar"}
                 </button>
                 {bookingState.status === "success" && (
-                  <p className="success">
-                    {bookingState.message}
-                    {bookingSummary?.id && (
-                      <span> ID: {bookingSummary.id}</span>
-                    )}
-                  </p>
+                  <StatusMessage
+                    variant="success"
+                    title={bookingState.message}
+                    meta={bookingMeta}
+                  />
                 )}
                 {bookingState.status === "conflict" && (
-                  <p className="warning">
-                    {bookingState.message} Se actualizo la disponibilidad.
-                  </p>
+                  <StatusMessage
+                    variant="warning"
+                    title={`${bookingState.message} Disponibilidad actualizada.`}
+                    meta={bookingErrorMeta}
+                  />
                 )}
                 {bookingState.status === "error" && (
-                  <p className="error">{bookingState.message}</p>
+                  <StatusMessage
+                    variant="error"
+                    title={bookingState.message}
+                    meta={bookingErrorMeta}
+                    role="alert"
+                  />
                 )}
               </div>
             </form>
+          )}
+        </section>
+
+        <section className="card full" aria-labelledby="admin-lectura">
+          <div className="card-header">
+            <div>
+              <h2 id="admin-lectura">Admin (lectura)</h2>
+              <p className="body">
+                Consulta de reservas para la fecha seleccionada.
+              </p>
+            </div>
+            <span
+              className={`badge badge-${adminToken ? "ok" : "warn"}`}
+              aria-live="polite"
+            >
+              {adminToken ? "Sesion admin activa" : "Sesion admin inactiva"}
+            </span>
+          </div>
+
+          {!apiBaseUrl ? (
+            <p className="muted">
+              Configura VITE_API_BASE_URL para habilitar la vista admin.
+            </p>
+          ) : (
+            <div className="admin">
+              {!adminToken ? (
+                <form className="admin-login" onSubmit={handleAdminLogin}>
+                  <div className="field">
+                    <label htmlFor="admin-token">Token admin</label>
+                    <input
+                      id="admin-token"
+                      type="password"
+                      className="input"
+                      value={adminInput}
+                      onChange={(event) => setAdminInput(event.target.value)}
+                      placeholder="Bearer token"
+                    />
+                  </div>
+                  <button type="submit" className="button">
+                    Entrar
+                  </button>
+                </form>
+              ) : (
+                <div className="admin-active">
+                  <p className="meta">Fecha actual: {adminDate}</p>
+                  <div className="inline-actions">
+                    <button
+                      type="button"
+                      className="button"
+                      onClick={loadAdminBookings}
+                      disabled={adminState.status === "loading"}
+                    >
+                      {adminState.status === "loading"
+                        ? "Cargando..."
+                        : "Cargar reservas"}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-secondary"
+                      onClick={handleAdminLogout}
+                    >
+                      Salir
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {adminState.status === "loading" && (
+                <p className="muted">Cargando reservas...</p>
+              )}
+              {adminState.status === "error" && (
+                <StatusMessage
+                  variant="error"
+                  title={adminState.message}
+                  meta={adminErrorMeta}
+                  role="alert"
+                />
+              )}
+              {adminState.status === "empty" && (
+                <p className="muted">Sin reservas para la fecha.</p>
+              )}
+              {adminState.status === "success" && (
+                <div className="table" role="table" aria-live="polite">
+                  <div className="table-head" role="row">
+                    <span role="columnheader">Creada</span>
+                    <span role="columnheader">Fecha</span>
+                    <span role="columnheader">Slot</span>
+                    <span role="columnheader">Nombre</span>
+                    <span role="columnheader">Email</span>
+                    <span role="columnheader">Estado</span>
+                    <span role="columnheader">ID</span>
+                  </div>
+                  {adminState.items.map((reserva) => (
+                    <div key={reserva.id} className="table-row" role="row">
+                      <span role="cell">{formatDateTime(reserva.creadaEn)}</span>
+                      <span role="cell">{adminDate}</span>
+                      <span role="cell">{reserva.slotId || "-"}</span>
+                      <span role="cell">{reserva.nombre || "-"}</span>
+                      <span role="cell">{reserva.email || "-"}</span>
+                      <span role="cell">{reserva.estado || "-"}</span>
+                      <span role="cell" className="mono">
+                        {reserva.id}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </section>
       </main>
