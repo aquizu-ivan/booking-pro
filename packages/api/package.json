@@ -8,9 +8,12 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "db:migrate": "prisma migrate deploy",
-    "db:seed": "tsx prisma/seed.ts",
+    "db:seed": "prisma db seed",
     "qa:concurrency": "node scripts/concurrency.mjs",
     "qa:concurrency:railway": "node scripts/concurrency.mjs"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.mjs"
   },
   "dependencies": {
     "@fastify/cors": "^8.5.0",
