@@ -1,23 +1,13 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { env } from "./lib/env.js";
+import { buildError, isAppError, mapPrismaError } from "./lib/errors.js";
+import disponibilidadRoutes from "./routes/disponibilidad.js";
+import reservasRoutes from "./routes/reservas.js";
+import adminRoutes from "./routes/admin.js";
 
 const app = Fastify({
   logger: env.NODE_ENV !== "test"
-});
-
-const buildError = (
-  code: string,
-  message: string,
-  details: unknown = null
-) => ({
-  ok: false,
-  error: {
-    code,
-    message,
-    details,
-    timestamp: new Date().toISOString()
-  }
 });
 
 app.register(cors, {
@@ -33,6 +23,10 @@ app.get("/health", async () => ({
   timestamp: new Date().toISOString()
 }));
 
+app.register(disponibilidadRoutes);
+app.register(reservasRoutes);
+app.register(adminRoutes);
+
 app.setNotFoundHandler((request, reply) => {
   reply.status(404).send(
     buildError("NO_ENCONTRADO", "Ruta no encontrada.", {
@@ -43,6 +37,19 @@ app.setNotFoundHandler((request, reply) => {
 });
 
 app.setErrorHandler((error, _request, reply) => {
+  if (isAppError(error)) {
+    reply.status(error.statusCode).send(buildError(error.code, error.message, error.details));
+    return;
+  }
+
+  const prismaError = mapPrismaError(error);
+  if (prismaError) {
+    reply
+      .status(prismaError.statusCode)
+      .send(buildError(prismaError.code, prismaError.message, prismaError.details));
+    return;
+  }
+
   const statusCode = error.statusCode ?? 500;
   const code = statusCode === 404 ? "NO_ENCONTRADO" : "ERROR_INTERNO";
   const message =
