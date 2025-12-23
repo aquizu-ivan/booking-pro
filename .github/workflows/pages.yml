@@ -38,9 +38,8 @@ jobs:
       - name: Build web
         env:
           VITE_API_BASE_URL: https://booking-pro-booking-pro-api.up.railway.app
-        run: |
-          cd packages/web
-          pnpm run build
+        working-directory: packages/web
+        run: pnpm run build
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
