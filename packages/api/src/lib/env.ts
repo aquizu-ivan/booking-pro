@@ -10,6 +10,7 @@ const parsePort = (value: string | undefined, fallback: number) => {
 const nodeEnv = process.env.NODE_ENV ?? "development";
 const tz = process.env.TZ ?? "UTC";
 const corsOrigin = process.env.CORS_ORIGIN ?? "http://localhost:5173";
+const adminAccessToken = process.env.ADMIN_ACCESS_TOKEN ?? "";
 const port = parsePort(process.env.PORT ?? process.env.API_PORT, 4000);
 
 if (!process.env.NODE_ENV) {
@@ -24,5 +25,6 @@ export const env = {
   NODE_ENV: nodeEnv,
   PORT: port,
   TZ: tz,
-  CORS_ORIGIN: corsOrigin
+  CORS_ORIGIN: corsOrigin,
+  ADMIN_ACCESS_TOKEN: adminAccessToken
 } as const;

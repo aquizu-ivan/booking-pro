@@ -11,6 +11,7 @@
 - `TZ` (por defecto: `UTC`)
 - `CORS_ORIGIN` (por defecto: `http://localhost:5173`)
 - `DATABASE_URL` (conexion a Postgres)
+- `ADMIN_ACCESS_TOKEN` (token para endpoints admin)
 
 ## Endpoints
 
@@ -29,3 +30,23 @@ Para migraciones, usa la conexion DIRECT de Neon en `DATABASE_URL`.
 ## Nota Railway
 
 La API escucha en `0.0.0.0` y usa el puerto de `PORT`.
+
+## QA (curl)
+
+Salud:
+`curl -s http://localhost:4000/health`
+
+Disponibilidad:
+`curl -s "http://localhost:4000/api/disponibilidad?fecha=2025-01-15"`
+
+Crear reserva (201):
+`curl -s -X POST http://localhost:4000/api/reservas -H "Content-Type: application/json" -d "{\"slotId\":\"SLOT_ID\",\"nombre\":\"Juan Perez\",\"contacto\":{\"email\":\"juan@example.com\",\"telefono\":\"+5491112345678\"}}"`
+
+Crear reserva (409, mismo slot):
+`curl -s -X POST http://localhost:4000/api/reservas -H "Content-Type: application/json" -d "{\"slotId\":\"SLOT_ID\",\"nombre\":\"Juan Perez\",\"contacto\":{\"email\":\"juan@example.com\"}}"`
+
+Admin reservas (401):
+`curl -s "http://localhost:4000/api/admin/reservas?fecha=2025-01-15"`
+
+Admin reservas (200):
+`curl -s -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" "http://localhost:4000/api/admin/reservas?fecha=2025-01-15"`
