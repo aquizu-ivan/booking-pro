@@ -124,6 +124,7 @@ const printLine = (label, value) => {
 const main = async () => {
   const baseUrl = (process.env.API_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, "");
   const concurrency = getEnvNumber(process.env.CONCURRENCY, DEFAULT_CONCURRENCY);
+  const verbose = process.env.VERBOSE === "1";
   const envDate = process.env.DATE?.trim();
   let targetDate = envDate || formatDateInZone(new Date());
 
@@ -140,12 +141,14 @@ const main = async () => {
       throw new Error(`Disponibilidad fallo con status ${response.status}.`);
     }
     const slots = extractSlots(data);
-    return { slots, date };
+    return { slots, date, url };
   };
 
   let disponibilidad;
+  let availabilityUrl = "";
   try {
     disponibilidad = await tryAvailability(targetDate);
+    availabilityUrl = disponibilidad.url;
   } catch (error) {
     console.error("No se pudo consultar disponibilidad:", error.message);
     process.exit(1);
@@ -160,6 +163,7 @@ const main = async () => {
       try {
         disponibilidad = await tryAvailability(tomorrow);
         targetDate = tomorrow;
+        availabilityUrl = disponibilidad.url;
         slotId = findDisponible(disponibilidad.slots);
       } catch (error) {
         console.error("No se pudo consultar disponibilidad para manana:", error.message);
@@ -238,8 +242,11 @@ const main = async () => {
     }
 
     if (value.status === "error") {
-      const message = value.error?.name === "AbortError" ? "timeout" : value.error?.message;
-      registerOther("error", `Error de red: ${message || "error desconocido"}`);
+      const message =
+        value.error?.name === "AbortError"
+          ? "tiempo de espera"
+          : value.error?.message || "error desconocido";
+      registerOther("error", `error: ${message}`);
       continue;
     }
 
@@ -248,32 +255,37 @@ const main = async () => {
     try {
       const text = await value.response.text();
       if (text) {
-        sample = `Status ${statusKey}: ${text.slice(0, 200)}`;
+        const shortText = text.replace(/\s+/g, " ").trim().slice(0, 160);
+        sample = `${statusKey}: ${shortText}`;
       } else {
-        sample = `Status ${statusKey}: sin cuerpo`;
+        sample = `${statusKey}: sin cuerpo`;
       }
     } catch (error) {
-      sample = `Status ${statusKey}: error al leer cuerpo`;
+      sample = `${statusKey}: error al leer cuerpo`;
     }
     registerOther(statusKey, sample);
   }
 
-  printLine("Target", `${baseUrl} | Fecha ${targetDate} | Slot ${slotId}`);
-  printLine("Concurrent requests", concurrency);
-  printLine("Results", `201:${count201}, 409:${count409}, other:${countOther}`);
-
-  if (countOther > 0) {
-    const breakdownText = Array.from(breakdown.entries())
-      .map(([key, value]) => `${key}:${value}`)
-      .join(", ");
-    printLine("Breakdown", breakdownText);
-    if (samples.length > 0) {
-      printLine("Muestras", samples.join(" | "));
-    }
+  printLine("Objetivo", `${baseUrl} | Fecha ${targetDate} | Slot ${slotId}`);
+  if (verbose) {
+    printLine("URL disponibilidad", availabilityUrl || "no disponible");
+  }
+  printLine("Peticiones concurrentes", concurrency);
+  printLine("Resultados", `201:${count201}, 409:${count409}, otros:${countOther}`);
+  const breakdownText =
+    breakdown.size > 0
+      ? Array.from(breakdown.entries())
+          .map(([key, value]) => `${key}:${value}`)
+          .join(", ")
+      : "-";
+  printLine("Desglose", breakdownText);
+  if (verbose) {
+    printLine("Muestras", samples.length > 0 ? samples.join(" | ") : "-");
   }
 
   const pass = count201 === 1 && count409 === concurrency - 1 && countOther === 0;
   printLine("Final", pass ? "PASS" : "FAIL");
+  printLine("Salida", pass ? "0" : "1");
   process.exit(pass ? 0 : 1);
 };
 
