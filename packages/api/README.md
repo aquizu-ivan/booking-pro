@@ -50,3 +50,18 @@ Admin reservas (401):
 
 Admin reservas (200):
 `curl -s -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" "http://localhost:4000/api/admin/reservas?fecha=2025-01-15"`
+
+## QA de concurrencia (exhibicion)
+
+Local:
+`pnpm --filter @booking-pro/api run qa:concurrency`
+
+Railway:
+`API_BASE_URL="https://TU-API" CONCURRENCY=30 pnpm --filter @booking-pro/api run qa:concurrency`
+
+DATE opcional:
+`DATE="2025-12-23" pnpm --filter @booking-pro/api run qa:concurrency`
+
+Expectativa: `1x201 + (N-1)x409`.
+
+Nota: si no hay disponibilidad hoy, el script intenta manana automaticamente.
