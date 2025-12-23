@@ -80,7 +80,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       return {
         ok: true,
         fecha: parsed.value,
-        reservas: reservas.map((reserva) => ({
+        reservas: reservas.map((reserva: { id: string; slotId: string; nombre: string; estado: string; creadaEn: Date }) => ({
           id: reserva.id,
           slotId: reserva.slotId,
           nombre: reserva.nombre,

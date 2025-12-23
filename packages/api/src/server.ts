@@ -2,6 +2,9 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { env } from "./lib/env.js";
 import { buildError, isAppError, mapPrismaError } from "./lib/errors.js";
+import servicesRoutes from "./routes/services.js";
+import availabilityRoutes from "./routes/availability.js";
+import bookingsRoutes from "./routes/bookings.js";
 import disponibilidadRoutes from "./routes/disponibilidad.js";
 import reservasRoutes from "./routes/reservas.js";
 import adminRoutes from "./routes/admin.js";
@@ -23,6 +26,9 @@ app.get("/health", async () => ({
   timestamp: new Date().toISOString()
 }));
 
+app.register(servicesRoutes);
+app.register(availabilityRoutes);
+app.register(bookingsRoutes);
 app.register(disponibilidadRoutes);
 app.register(reservasRoutes);
 app.register(adminRoutes);

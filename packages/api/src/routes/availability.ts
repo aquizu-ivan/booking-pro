@@ -4,8 +4,10 @@ import { badRequest } from "../lib/errors.js";
 
 const ZONA_HORARIA = "America/Argentina/Buenos_Aires";
 
-type DisponibilidadQuery = {
+type AvailabilityQuery = {
+  date?: string;
   fecha?: string;
+  serviceId?: string;
 };
 
 const parseFecha = (value?: string) => {
@@ -32,13 +34,14 @@ const parseFecha = (value?: string) => {
   return { date, value: trimmed };
 };
 
-export default async function disponibilidadRoutes(app: FastifyInstance) {
-  app.get<{ Querystring: DisponibilidadQuery }>("/api/disponibilidad", async (request) => {
-    const parsed = parseFecha(request.query.fecha);
+export default async function availabilityRoutes(app: FastifyInstance) {
+  app.get<{ Querystring: AvailabilityQuery }>("/api/availability", async (request) => {
+    const requested = request.query.date ?? request.query.fecha;
+    const parsed = parseFecha(requested);
 
     if (!parsed) {
       throw badRequest("FECHA_INVALIDA", "Fecha invalida.", {
-        fecha: request.query.fecha ?? null
+        fecha: requested ?? null
       });
     }
 
@@ -54,13 +57,13 @@ export default async function disponibilidadRoutes(app: FastifyInstance) {
 
     return {
       ok: true,
-      fecha: parsed.value,
-      zonaHoraria: ZONA_HORARIA,
+      date: parsed.value,
+      timeZone: ZONA_HORARIA,
       slots: slots.map((slot: { id: string; inicio: Date; fin: Date; reserva: { estado: string } | null }) => ({
-        slotId: slot.id,
-        inicio: slot.inicio.toISOString(),
-        fin: slot.fin.toISOString(),
-        estado: slot.reserva?.estado === "CONFIRMADA" ? "ocupado" : "disponible"
+        id: slot.id,
+        start: slot.inicio.toISOString(),
+        end: slot.fin.toISOString(),
+        status: slot.reserva?.estado === "CONFIRMADA" ? "ocupado" : "disponible"
       }))
     };
   });
