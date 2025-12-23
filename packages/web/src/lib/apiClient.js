@@ -81,10 +81,12 @@ export const requestJson = async (path, options = {}) => {
     return {
       ok: false,
       error: {
+        code: data?.error?.code ?? data?.code ?? null,
         status: response.status,
         kind: mapStatusKind(response.status),
         message,
-        details: data?.error?.details ?? data?.details ?? null
+        details: data?.error?.details ?? data?.details ?? null,
+        timestamp: data?.error?.timestamp ?? data?.timestamp ?? null
       }
     };
   } catch (error) {
@@ -116,3 +118,12 @@ export const createBooking = (payload) =>
     },
     body: JSON.stringify(payload)
   });
+
+export const getAdminBookings = (token, params) => {
+  const query = new URLSearchParams(params).toString();
+  return requestJson(`/api/admin/reservas?${query}`, {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+};
