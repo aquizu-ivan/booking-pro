@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -38,8 +39,7 @@ jobs:
       - name: Build web
         env:
           VITE_API_BASE_URL: https://booking-pro-booking-pro-api.up.railway.app
-        working-directory: packages/web
-        run: pnpm run build
+        run: pnpm --filter @booking-pro/web run build -- --base=/booking-pro/
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
