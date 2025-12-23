@@ -34,8 +34,24 @@ const buildInfo = {
   ]
 };
 
+const allowedOrigins = env.CORS_ORIGIN.split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+
 app.register(cors, {
-  origin: env.CORS_ORIGIN,
+  origin: (origin, callback) => {
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`Origen no permitido por CORS: ${origin}`), false);
+  },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   optionsSuccessStatus: 204
 });

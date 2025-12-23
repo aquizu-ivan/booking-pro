@@ -9,7 +9,7 @@
 - `NODE_ENV` (por defecto: `development`)
 - `PORT` (prioridad), `API_PORT` (fallback)
 - `TZ` (por defecto: `UTC`)
-- `CORS_ORIGIN` (por defecto: `http://localhost:5173`)
+- `CORS_ORIGIN` (por defecto: `http://localhost:5173`) admite lista separada por comas (ej: `http://localhost:5173,https://aquizu-ivan.github.io`)
 - `DATABASE_URL` (conexion a Postgres)
 - `ADMIN_ACCESS_TOKEN` (token para endpoints admin)
 
