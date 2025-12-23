@@ -25,6 +25,10 @@ Para aplicar migraciones:
 Para ejecutar el seed:
 `pnpm --filter @booking-pro/api db:seed`
 
+El seed es idempotente: no duplica slots si se corre mas de una vez.
+
+En Railway, ejecutar el mismo comando con `DATABASE_URL` DIRECT configurado.
+
 Para migraciones, usa la conexion DIRECT de Neon en `DATABASE_URL`.
 
 ## Nota Railway
