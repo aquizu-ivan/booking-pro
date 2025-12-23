@@ -34,12 +34,23 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Build web
         env:
           VITE_API_BASE_URL: https://booking-pro-booking-pro-api.up.railway.app
-        run: pnpm --filter @booking-pro/web run build -- --base=/booking-pro/
+          GITHUB_PAGES: "true"
+        run: pnpm --filter @booking-pro/web run build
+
+      - name: QA de exhibicion completa
+        run: |
+          echo "Base usado: /booking-pro/"
+          echo "Publish dir: packages/web/dist"
+          ls -la packages/web/dist
+          if [ -f packages/web/dist/index.html ]; then
+            echo "Chequeo base en index.html:"
+            grep -n "/booking-pro/" packages/web/dist/index.html || true
+          fi
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
