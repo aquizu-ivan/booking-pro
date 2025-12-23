@@ -70,6 +70,18 @@ h1 {
   box-shadow: var(--shadow);
 }
 
+.card.full {
+  grid-column: 1 / -1;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
 .card h2 {
   margin: 0 0 12px;
   font-size: 20px;
@@ -97,6 +109,21 @@ h1 {
   margin: 12px 0 0;
 }
 
+.error {
+  color: #ff9090;
+  margin: 8px 0 0;
+}
+
+.warning {
+  color: #ffd27a;
+  margin: 8px 0 0;
+}
+
+.success {
+  color: #8ee4a4;
+  margin: 8px 0 0;
+}
+
 .meta {
   color: var(--muted);
   font-size: 14px;
@@ -115,6 +142,12 @@ h1 {
   font-weight: 600;
   text-decoration: none;
   transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.button-secondary {
+  background: transparent;
+  border-color: var(--panel-border);
+  color: var(--text);
 }
 
 .button:hover {
@@ -147,8 +180,106 @@ h1 {
   color: var(--accent-strong);
 }
 
+.badge {
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 600;
+  background: #2a2f3a;
+  color: var(--muted);
+}
+
+.badge-ok {
+  background: rgba(142, 228, 164, 0.15);
+  color: #8ee4a4;
+}
+
+.badge-error {
+  background: rgba(255, 144, 144, 0.15);
+  color: #ff9090;
+}
+
+.badge-warn {
+  background: rgba(255, 210, 122, 0.15);
+  color: #ffd27a;
+}
+
+.flow {
+  display: grid;
+  gap: 20px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.field label {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.input {
+  background: #0f131b;
+  border: 1px solid #262c38;
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.input:focus-visible {
+  outline: 3px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+.slots {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.slot {
+  border: 1px solid #262c38;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #0f131b;
+}
+
+.slot--off {
+  opacity: 0.6;
+}
+
+.slot-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.slot-label input {
+  accent-color: var(--accent);
+}
+
+.slot-time {
+  min-width: 110px;
+}
+
+.slot-status {
+  color: var(--muted);
+  margin-left: auto;
+}
+
 @media (max-width: 720px) {
   .page {
     padding: 40px 20px 64px;
+  }
+
+  .card-header {
+    flex-direction: column;
   }
 }
