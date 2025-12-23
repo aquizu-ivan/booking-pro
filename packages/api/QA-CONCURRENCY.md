@@ -1,13 +1,13 @@
 # QA de Concurrencia — Booking Pro (API)
 
-## Que demuestra esta prueba
-- Ante N requests simultaneas sobre el mismo slot, solo 1 reserva se confirma (201).
-- El resto de las requests deben fallar con conflicto (409) por colision de slot.
+## Qué demuestra esta prueba
+- Ante N requests simultáneas sobre el mismo slot, solo 1 reserva se confirma (201).
+- El resto de las requests deben fallar con conflicto (409) por colisión de slot.
 - El estado de los datos no se corrompe ni quedan reservas duplicadas.
-- El resultado debe ser determinista: 1x201 + (N-1)x409, sin otros codigos.
+- El resultado debe ser determinista: 1x201 + (N-1)x409, sin otros códigos.
 - La prueba valida el comportamiento bajo carga concurrente real.
 
-## Como ejecutar la prueba
+## Cómo ejecutar la prueba
 ### Local
 ```bash
 pnpm --filter @booking-pro/api run qa:concurrency
@@ -44,11 +44,11 @@ Final: FAIL
 Salida: 1
 ```
 
-## Como interpretar el resultado
+## Cómo interpretar el resultado
 - PASS: el backend colisiona sin romperse; solo una reserva es confirmada.
 - FAIL: hubo errores inesperados (validaciones, red o 5xx) y se debe revisar el desglose.
 
 ## Notas operativas
-- Si no hay slots disponibles hoy, el script intenta manana automaticamente.
-- Si no hay disponibilidad, la prueba falla de forma explicita.
+- Si no hay slots disponibles hoy, el script intenta mañana automáticamente.
+- Si no hay disponibilidad, la prueba falla de forma explícita.
 - No se usan dependencias externas ni tooling adicional.
