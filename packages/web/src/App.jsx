@@ -55,7 +55,7 @@ export default function App() {
         <section className="card" aria-labelledby="qa-exhibible">
           <h2 id="qa-exhibible">QA exhibible</h2>
           <p className="body">
-            Documento interno: <span className="mono">packages/api/QA-CONCURRENCY.md</span>
+            Documento interno: <span className="mono">packages\api\QA-CONCURRENCY.md</span>
           </p>
           <div className="code">
             <pre>
