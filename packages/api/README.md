@@ -53,6 +53,8 @@ Admin reservas (200):
 
 ## QA de concurrencia (exhibicion)
 
+Ver `QA-CONCURRENCY.md`.
+
 Variables:
 | Variable | Descripcion | Default |
 | --- | --- | --- |
