@@ -184,12 +184,69 @@ const StatusMessage = ({ variant, title, meta, role = "status" }) => (
     )}
   </div>
 );
+const getErrorPresentation = (error, fallback) => {
+  if (!error) {
+    return { title: fallback || "Error inesperado.", variant: "error" };
+  }
+
+  if (error.kind === "cors") {
+    return {
+      title: "CORS bloqueado: origen no permitido.",
+      variant: "error"
+    };
+  }
+
+  if (error.kind === "network") {
+    return {
+      title: "Red no disponible. No se pudo conectar con la API.",
+      variant: "error"
+    };
+  }
+
+  if (error.kind === "server" || (error.status && error.status >= 500)) {
+    return {
+      title: "Error del servidor. Intenta nuevamente.",
+      variant: "error"
+    };
+  }
+
+  if (error.code === "DATOS_INVALIDOS" || error.kind === "bad_request") {
+    return {
+      title: "Datos invalidos. Revisa los campos requeridos.",
+      variant: "warning"
+    };
+  }
+
+  if (error.code === "HORARIO_NO_DISPONIBLE" || error.status === 409) {
+    return {
+      title: "Colision controlada: el horario ya fue tomado.",
+      variant: "warning"
+    };
+  }
+
+  if (error.status && error.status >= 400 && error.status < 500) {
+    return {
+      title: "Solicitud invalida. Verifica los datos enviados.",
+      variant: "warning"
+    };
+  }
+
+  return { title: error.message || fallback || "Error inesperado.", variant: "error" };
+};
 
 export default function App() {
   const apiBaseUrl = API_BASE_URL;
+  const isProd = import.meta.env.PROD;
   const healthUrl = apiBaseUrl ? `${apiBaseUrl}/health` : "";
   const apiLabel =
     apiBaseUrl.length > 48 ? `${apiBaseUrl.slice(0, 45)}...` : apiBaseUrl;
+  const missingApiTitle = isProd
+    ? "API no configurada en produccion."
+    : "API no configurada.";
+  const missingApiMeta = isProd
+    ? ["Configura VITE_API_BASE_URL en GitHub Pages."]
+    : [];
+  const missingApiVariant = isProd ? "error" : "warning";
 
   const [healthState, setHealthState] = useState({
     status: "idle",
@@ -223,6 +280,7 @@ export default function App() {
     booking: null,
     error: null
   });
+  const [lastBookingPayload, setLastBookingPayload] = useState(null);
   const [adminInput, setAdminInput] = useState("");
   const [adminToken, setAdminToken] = useState("");
   const [adminState, setAdminState] = useState({
@@ -270,48 +328,56 @@ export default function App() {
     };
   }, [apiBaseUrl]);
 
+  const loadServices = useCallback(async () => {
+    if (!apiBaseUrl) {
+      return;
+    }
+
+    setServicesState({ status: "loading", items: [], message: "", error: null });
+    const result = await getServices();
+    if (result.ok) {
+      const services = normalizeServices(result.data);
+      if (services.length === 0) {
+        setServicesState({
+          status: "empty",
+          items: [],
+          message: "Sin servicios disponibles.",
+          error: null
+        });
+      } else {
+        setServicesState({
+          status: "success",
+          items: services,
+          message: "",
+          error: null
+        });
+      }
+    } else {
+      setServicesState({
+        status: "error",
+        items: [],
+        message: result.error.message,
+        error: result.error
+      });
+    }
+  }, [apiBaseUrl]);
+
   useEffect(() => {
     if (!apiBaseUrl) {
       return;
     }
 
     let active = true;
-    setServicesState({ status: "loading", items: [], message: "", error: null });
-    getServices().then((result) => {
+    loadServices().then(() => {
       if (!active) {
         return;
-      }
-      if (result.ok) {
-        const services = normalizeServices(result.data);
-        if (services.length === 0) {
-          setServicesState({
-            status: "empty",
-            items: [],
-            message: "Sin servicios disponibles.",
-            error: null
-          });
-        } else {
-          setServicesState({
-            status: "success",
-            items: services,
-            message: "",
-            error: null
-          });
-        }
-      } else {
-        setServicesState({
-          status: "error",
-          items: [],
-          message: result.error.message,
-          error: result.error
-        });
       }
     });
 
     return () => {
       active = false;
     };
-  }, [apiBaseUrl]);
+  }, [apiBaseUrl, loadServices]);
 
   useEffect(() => {
     if (servicesState.status !== "success") {
@@ -407,7 +473,7 @@ export default function App() {
 
   const healthBadge = useMemo(() => {
     if (!apiBaseUrl) {
-      return { label: "API no configurada", kind: "warn" };
+      return { label: "API no configurada", kind: isProd ? "error" : "warn" };
     }
     if (healthState.status === "ok") {
       return { label: "API viva", kind: "ok" };
@@ -416,7 +482,50 @@ export default function App() {
       return { label: "API no disponible", kind: "error" };
     }
     return { label: "Chequeando API", kind: "idle" };
-  }, [apiBaseUrl, healthState.status]);
+  }, [apiBaseUrl, healthState.status, isProd]);
+
+  const submitBooking = useCallback(
+    async (payload) => {
+      setBookingState({
+        status: "loading",
+        message: "",
+        booking: null,
+        error: null
+      });
+
+      const result = await createBooking(payload);
+
+      if (result.ok) {
+        const booking = extractBooking(result.data);
+        setBookingState({
+          status: "success",
+          message: "Reserva confirmada.",
+          booking,
+          error: null
+        });
+        return;
+      }
+
+      if (result.error.kind === "conflict" || result.error.status === 409) {
+        setBookingState({
+          status: "conflict",
+          message: "Colision controlada: el horario ya fue tomado.",
+          booking: null,
+          error: result.error
+        });
+        await loadAvailability();
+        return;
+      }
+
+      setBookingState({
+        status: "error",
+        message: result.error.message,
+        booking: null,
+        error: result.error
+      });
+    },
+    [loadAvailability]
+  );
 
   const handleBooking = async (event) => {
     event.preventDefault();
@@ -454,49 +563,17 @@ export default function App() {
       return;
     }
 
-    setBookingState({
-      status: "loading",
-      message: "",
-      booking: null,
-      error: null
-    });
-    const result = await createBooking({
+    const payload = {
       serviceId,
       slotId: selectedSlotId,
       name: name.trim(),
       email: email.trim(),
       phone: phone.trim() || null,
       date
-    });
+    };
 
-    if (result.ok) {
-      const booking = extractBooking(result.data);
-      setBookingState({
-        status: "success",
-        message: "Reserva confirmada.",
-        booking,
-        error: null
-      });
-      return;
-    }
-
-    if (result.error.kind === "conflict" || result.error.status === 409) {
-      setBookingState({
-        status: "conflict",
-        message: "Colision controlada: el horario ya fue tomado.",
-        booking: null,
-        error: result.error
-      });
-      await loadAvailability();
-      return;
-    }
-
-    setBookingState({
-      status: "error",
-      message: result.error.message,
-      booking: null,
-      error: result.error
-    });
+    setLastBookingPayload(payload);
+    await submitBooking(payload);
   };
 
   const bookingSummary = bookingState.booking;
@@ -505,6 +582,18 @@ export default function App() {
   const availabilityErrorMeta = buildErrorMeta(availabilityState.error);
   const servicesErrorMeta = buildErrorMeta(servicesState.error);
 
+  const servicesErrorPresentation = getErrorPresentation(
+    servicesState.error,
+    servicesState.message
+  );
+  const availabilityErrorPresentation = getErrorPresentation(
+    availabilityState.error,
+    availabilityState.message
+  );
+  const bookingErrorPresentation = getErrorPresentation(
+    bookingState.error,
+    bookingState.message
+  );
   const handleAdminLogin = (event) => {
     event.preventDefault();
     const trimmed = adminInput.trim();
@@ -602,6 +691,10 @@ export default function App() {
   }, [adminToken, date]);
 
   const adminErrorMeta = buildErrorMeta(adminState.error);
+  const adminErrorPresentation = getErrorPresentation(
+    adminState.error,
+    adminState.message
+  );
   const adminDate = date;
 
   return (
@@ -634,13 +727,12 @@ export default function App() {
               </a>
             </div>
           ) : (
-            <div className="stack">
-              <h3 className="status-title">API no configurada</h3>
-              <p className="muted">
-                Configurar VITE_API_BASE_URL en el entorno de build de GitHub
-                Pages.
-              </p>
-            </div>
+            <StatusMessage
+              variant={missingApiVariant}
+              title={missingApiTitle}
+              meta={missingApiMeta}
+              role="alert"
+            />
           )}
         </section>
 
@@ -674,9 +766,12 @@ export default function App() {
           </div>
 
           {!apiBaseUrl ? (
-            <p className="muted">
-              Configura VITE_API_BASE_URL para habilitar el flujo.
-            </p>
+            <StatusMessage
+              variant={missingApiVariant}
+              title={missingApiTitle}
+              meta={missingApiMeta}
+              role="alert"
+            />
           ) : (
             <form className="flow" onSubmit={handleBooking}>
               <div className="field">
@@ -685,12 +780,21 @@ export default function App() {
                   <p className="muted">Cargando servicios...</p>
                 )}
                 {servicesState.status === "error" && (
-                  <StatusMessage
-                    variant="error"
-                    title={servicesState.message}
-                    meta={servicesErrorMeta}
-                    role="alert"
-                  />
+                  <div className="stack">
+                    <StatusMessage
+                      variant={servicesErrorPresentation.variant}
+                      title={servicesErrorPresentation.title}
+                      meta={servicesErrorMeta}
+                      role="alert"
+                    />
+                    <button
+                      type="button"
+                      className="button button-secondary"
+                      onClick={loadServices}
+                    >
+                      Reintentar
+                    </button>
+                  </div>
                 )}
                 {servicesState.status === "empty" && (
                   <p className="muted">Sin servicios disponibles.</p>
@@ -720,7 +824,7 @@ export default function App() {
                   value={date}
                   onChange={(event) => setDate(event.target.value)}
                 />
-                <p className="helper">Zona horaria: {TIME_ZONE}</p>
+                <p className="helper">Horarios en Argentina (AR).</p>
               </div>
 
               <div className="field">
@@ -729,12 +833,21 @@ export default function App() {
                   <p className="muted">Cargando horarios...</p>
                 )}
                 {availabilityState.status === "error" && (
-                  <StatusMessage
-                    variant="error"
-                    title={availabilityState.message}
-                    meta={availabilityErrorMeta}
-                    role="alert"
-                  />
+                  <div className="stack">
+                    <StatusMessage
+                      variant={availabilityErrorPresentation.variant}
+                      title={availabilityErrorPresentation.title}
+                      meta={availabilityErrorMeta}
+                      role="alert"
+                    />
+                    <button
+                      type="button"
+                      className="button button-secondary"
+                      onClick={loadAvailability}
+                    >
+                      Reintentar
+                    </button>
+                  </div>
                 )}
                 {availabilityState.status === "empty" && (
                   <p className="muted">Sin horarios para esta fecha.</p>
@@ -837,18 +950,28 @@ export default function App() {
                   />
                 )}
                 {bookingState.status === "error" && (
-                  <StatusMessage
-                    variant="error"
-                    title={bookingState.message}
-                    meta={bookingErrorMeta}
-                    role="alert"
-                  />
+                  <div className="stack">
+                    <StatusMessage
+                      variant={bookingErrorPresentation.variant}
+                      title={bookingErrorPresentation.title}
+                      meta={bookingErrorMeta}
+                      role="alert"
+                    />
+                    {lastBookingPayload && (
+                      <button
+                        type="button"
+                        className="button button-secondary"
+                        onClick={() => submitBooking(lastBookingPayload)}
+                      >
+                        Reintentar
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             </form>
           )}
         </section>
-
         <section className="card full" aria-labelledby="admin-lectura">
           <div className="card-header">
             <div>
@@ -866,9 +989,12 @@ export default function App() {
           </div>
 
           {!apiBaseUrl ? (
-            <p className="muted">
-              Configura VITE_API_BASE_URL para habilitar la vista admin.
-            </p>
+            <StatusMessage
+              variant={missingApiVariant}
+              title={missingApiTitle}
+              meta={missingApiMeta}
+              role="alert"
+            />
           ) : (
             <div className="admin">
               {!adminToken ? (
@@ -917,12 +1043,23 @@ export default function App() {
                 <p className="muted">Cargando reservas...</p>
               )}
               {adminState.status === "error" && (
-                <StatusMessage
-                  variant="error"
-                  title={adminState.message}
-                  meta={adminErrorMeta}
-                  role="alert"
-                />
+                <div className="stack">
+                  <StatusMessage
+                    variant={adminErrorPresentation.variant}
+                    title={adminErrorPresentation.title}
+                    meta={adminErrorMeta}
+                    role="alert"
+                  />
+                  {adminToken && (
+                    <button
+                      type="button"
+                      className="button button-secondary"
+                      onClick={loadAdminBookings}
+                    >
+                      Reintentar
+                    </button>
+                  )}
+                </div>
               )}
               {adminState.status === "empty" && (
                 <p className="muted">Sin reservas para la fecha.</p>

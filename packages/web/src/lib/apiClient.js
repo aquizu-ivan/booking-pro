@@ -1,10 +1,13 @@
 const normalizeBaseUrl = () => {
   const raw = import.meta.env.VITE_API_BASE_URL;
-  if (!raw || typeof raw !== "string") {
-    return "";
+  const trimmed = typeof raw === "string" ? raw.trim() : "";
+  if (trimmed) {
+    return trimmed.replace(/\/$/, "");
   }
-  const trimmed = raw.trim();
-  return trimmed ? trimmed.replace(/\/$/, "") : "";
+  if (import.meta.env.DEV) {
+    return "http://localhost:4000";
+  }
+  return "";
 };
 
 export const API_BASE_URL = normalizeBaseUrl();
@@ -46,6 +49,30 @@ const defaultMessageForStatus = (status) => {
     return "Error del servidor.";
   }
   return "Error de solicitud.";
+};
+
+const isCrossOrigin = () => {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  if (!API_BASE_URL) {
+    return false;
+  }
+  try {
+    return !API_BASE_URL.startsWith(window.location.origin);
+  } catch {
+    return true;
+  }
+};
+
+const inferFailureKind = (error) => {
+  if (error instanceof Error) {
+    const message = error.message || "";
+    if (isCrossOrigin() && /cors|failed to fetch|networkerror/i.test(message)) {
+      return "cors";
+    }
+  }
+  return "network";
 };
 
 export const requestJson = async (path, options = {}) => {
@@ -90,12 +117,18 @@ export const requestJson = async (path, options = {}) => {
       }
     };
   } catch (error) {
+    const kind = inferFailureKind(error);
+    const details = error instanceof Error ? error.message : null;
     return {
       ok: false,
       error: {
         status: 0,
-        kind: "network",
-        message: "No se pudo conectar con la API."
+        kind,
+        message:
+          kind === "cors"
+            ? "CORS bloqueado: origen no permitido."
+            : "No se pudo conectar con la API.",
+        details
       }
     };
   }
